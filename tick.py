@@ -1,8 +1,8 @@
 """PC 없이 1시간 1개 발행 — 비공개 저장소(threads-coupang)의 대기열을 보고 발행할 차례면 publish.yml 을 깨운다.
 tick.yml 이 5분마다(회차가 끝날 때 다음 회차를 직접 부르는 사슬) 실행한다.
 간격(60분+1분)·시간대·한 시간 1개·API 막힘 판단은 비공개 저장소의 tc/common.py publish_due 를 그대로 받아 쓴다.
-다음 회차까지 기다릴 환경(wait5/wait30/wait60/wait240)을 GITHUB_OUTPUT 의 next 로 넘긴다."""
-import os, sys, json, subprocess, datetime as dt
+다음 회차까지 기다릴 환경(wait1~5/wait30/wait60/wait240)을 GITHUB_OUTPUT 의 next 로 넘긴다."""
+import os, sys, json, math, subprocess, datetime as dt
 
 R = os.environ.get("R", "KangJH79/threads-coupang")
 OUT = os.environ.get("GITHUB_OUTPUT")
@@ -23,13 +23,16 @@ def put(nxt):
             f.write(f"next={nxt}\n")
 
 
-def next_wait(hours):
-    """발행 시간대 안이면 5분 뒤, 밖이면 시간대 시작 5분 전까지 크게 건너뛴다(밤엔 몇 번만 돈다)."""
+def next_wait(hours, due=None):
+    """발행 시간대 안이면 5분 뒤 — 간격이 풀리는 시각(due)이 5분 안이면 그 직후(1~4분)에 깨어난다
+    (5분 단위면 간격이 62~67분으로 벌어져 하루 10개를 19시대 안에 못 채우는 날이 생김).
+    시간대 밖이면 시작 5분 전까지 크게 건너뛴다(밤엔 몇 번만 돈다)."""
     now = dt.datetime.now()  # TZ=Asia/Seoul
     day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     start, end = day + dt.timedelta(hours=min(hours)), day + dt.timedelta(hours=max(hours) + 1)
     if start <= now < end:
-        return "wait5"
+        left = (due.replace(tzinfo=None) - now).total_seconds() / 60 if due else 0
+        return f"wait{max(1, math.ceil(left))}" if 0 < left < 5 else "wait5"
     if now >= end:
         start += dt.timedelta(days=1)
     mins = (start - now).total_seconds() / 60 - 5
@@ -54,13 +57,14 @@ def main():
         return
     sys.path.insert(0, os.path.abspath("w/tc"))
     import common
-    put(next_wait(common.config().get("publish_hours") or list(range(10, 20))))
+    q = json.load(open(common.QUEUE, encoding="utf-8"))
+    due = getattr(common, "next_due_time", lambda q: None)(q)
+    put(next_wait(common.config().get("publish_hours") or list(range(10, 20)), due))
     st = gh("run", "list", "-R", R, "--workflow", "publish.yml", "--limit", "1",
             "--json", "status", "--jq", ".[0].status", check=False).strip()
     if st in BUSY:
         print("발행 실행 중 → 건너뜀")
         return
-    q = json.load(open(common.QUEUE, encoding="utf-8"))
     why = common.publish_due(q)
     if why:
         print(why, "→ 건너뜀")
