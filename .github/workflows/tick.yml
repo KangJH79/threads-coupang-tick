@@ -1,0 +1,39 @@
+name: tick
+# PC 없이 1시간 1개 발행: 5분마다 비공개 저장소(KangJH79/threads-coupang) 대기열을 보고 차례면 발행 워크플로를 깨운다.
+# GitHub 예약(schedule)은 잘 안 돌아서(2026-10-04~05 이틀간 1번) 믿지 않고, 회차가 끝날 때 다음 회차를 직접 부른다(사슬).
+# 기다리는 동안은 environment 의 wait timer(러너 없이 대기) — wait5·wait30·wait60·wait240, 바로 = now.
+# 같은 group 은 실행 1 + 대기 1 만 남으므로 아래 schedule 이나 PC 가 다시 깨워도 사슬은 하나로 합쳐진다.
+on:
+  workflow_dispatch:
+    inputs:
+      wait:
+        description: 'wait5 / wait30 / wait60 / wait240 / now'
+        default: 'wait5'
+  schedule:
+    - cron: '7,37 * * * *'   # 사슬이 끊겼을 때 다시 잇는 보조(안 돌아도 PC 깨우기 dispatch.py 가 이어 줌)
+concurrency:
+  group: tick
+  cancel-in-progress: false
+permissions:
+  actions: write
+  contents: read
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: ${{ inputs.wait || 'now' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: check
+        id: c
+        env:
+          GH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+          R: KangJH79/threads-coupang
+          TZ: Asia/Seoul
+          PYTHONIOENCODING: utf-8
+        run: python3 tick.py
+      - name: next
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run tick.yml -R "$GITHUB_REPOSITORY" -f wait="${{ steps.c.outputs.next || 'wait5' }}"
