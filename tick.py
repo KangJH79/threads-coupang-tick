@@ -59,7 +59,9 @@ def main():
     import common
     q = json.load(open(common.QUEUE, encoding="utf-8"))
     due = getattr(common, "next_due_time", lambda q: None)(q)
-    put(next_wait(common.config().get("publish_hours") or list(range(10, 20)), due))
+    # 그날 늘린 시간대(config extra_hours)까지 — 2026-10-08 예비 3개를 19시 뒤에도 1시간 간격으로
+    hours = common.publish_hours() if hasattr(common, "publish_hours") else (common.config().get("publish_hours") or list(range(10, 20)))
+    put(next_wait(hours, due))
     st = gh("run", "list", "-R", R, "--workflow", "publish.yml", "--limit", "1",
             "--json", "status", "--jq", ".[0].status", check=False).strip()
     if st in BUSY:
