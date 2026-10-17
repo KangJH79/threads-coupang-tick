@@ -9,7 +9,7 @@ import os, sys, json, math, subprocess, datetime as dt
 R = os.environ.get("R", "KangJH79/threads-coupang")
 OUT = os.environ.get("GITHUB_OUTPUT")
 BUSY = ("queued", "in_progress", "waiting", "pending", "requested")
-ACCOUNTS = [("", ""), ("wol", "accounts/wol"), ("mb", "accounts/mb")]   # (publish.yml account 입력, 저장소 안 폴더) · mb = @moneyball7979(10-10)
+ACCOUNTS = [("", ""), ("wol", "accounts/wol"), ("mb", "accounts/mb"), ("mm", "accounts/mm")]   # (publish.yml account 입력, 저장소 안 폴더) · mb = @moneyball7979(10-10) · mm = @moneyman_7979(10-17, 7~16시)
 CHECK = r'''
 import os, sys, json
 sys.path.insert(0, os.path.abspath("w/tc"))
